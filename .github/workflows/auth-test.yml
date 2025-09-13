@@ -1,0 +1,23 @@
+name: Test GCP OIDC Auth
+on:
+  workflow_dispatch:
+
+jobs:
+  auth:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write     # REQUIRED for OIDC
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Auth to GCP via OIDC
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDP }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Who am I
+        run: gcloud auth list && gcloud config list

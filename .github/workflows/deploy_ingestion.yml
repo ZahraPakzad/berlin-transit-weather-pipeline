@@ -1,0 +1,60 @@
+name: Deploy Ingestion (Cloud Run Job)
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'ingestion/**'
+      - '.github/workflows/deploy_ingestion.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to GCP via OIDC
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDP }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Build & push image
+        run: |
+          IMAGE=gcr.io/${{ secrets.GCP_PROJECT_ID }}/ingest-weather
+          gcloud builds submit ingestion --tag $IMAGE
+
+      - name: Deploy Cloud Run Job
+        run: |
+          REGION=${{ secrets.GCP_REGION }}
+          IMAGE=gcr.io/${{ secrets.GCP_PROJECT_ID }}/ingest-weather
+          gcloud run jobs deploy ingest-weather \
+            --image $IMAGE \
+            --region $REGION \
+            --service-account ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Ensure Cloud Scheduler exists (every 5 min)
+        run: |
+          REGION=${{ secrets.GCP_REGION }}
+          URI=$(gcloud run jobs describe ingest-weather --region $REGION --format='value(status.uri)')
+          # create or update
+          if gcloud scheduler jobs describe ingest-weather-job >/dev/null 2>&1; then
+            gcloud scheduler jobs update http ingest-weather-job \
+              --schedule "*/5 * * * *" \
+              --uri "$URI" \
+              --http-method POST \
+              --oidc-service-account-email ${{ secrets.GCP_SA_EMAIL }}
+          else
+            gcloud scheduler jobs create http ingest-weather-job \
+              --schedule "*/5 * * * *" \
+              --uri "$URI" \
+              --http-method POST \
+              --oidc-service-account-email ${{ secrets.GCP_SA_EMAIL }}
+          fi
