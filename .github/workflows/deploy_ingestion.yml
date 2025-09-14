@@ -26,9 +26,9 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
       
-      - name: Enable required APIs (idempotent)
-        run: |
-          gcloud services enable run.googleapis.com cloudscheduler.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+      # - name: Enable required APIs (idempotent)
+      #   run: |
+      #     gcloud services enable run.googleapis.com cloudscheduler.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 
       - name: Build & push image (Artifact Registry)
         run: |
