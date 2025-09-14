@@ -21,3 +21,10 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
       - name: Who am I
         run: gcloud auth list && gcloud config list
+
+      - name: List Cloud Build buckets
+        run: gcloud storage buckets list
+      - name: Cloud Build smoke test
+        run: |
+          echo 'steps: [{name: "gcr.io/cloud-builders/gcloud", args: ["info"]}]' > cloudbuild.yaml
+          gcloud builds submit --config cloudbuild.yaml .
