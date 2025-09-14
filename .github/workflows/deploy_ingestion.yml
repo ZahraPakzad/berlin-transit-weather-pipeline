@@ -30,17 +30,34 @@ jobs:
       #   run: |
       #     gcloud services enable run.googleapis.com cloudscheduler.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 
+      # - name: Build & push image (Artifact Registry)
+      #   run: |
+      #     REGION=${{ secrets.GCP_REGION }}
+      #     PROJECT=${{ secrets.GCP_PROJECT_ID }}
+      #     REPO=containers
+      #     IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/ingest-weather"
+      #     # Ensure repo exists (one-time; safe to re-run)
+      #     gcloud artifacts repositories describe $REPO --location=$REGION || \
+      #       gcloud artifacts repositories create $REPO --repository-format=docker --location=$REGION
+      #     gcloud builds submit ingestion --tag "$IMAGE"
+      #     echo "IMAGE=$IMAGE" >> $GITHUB_ENV
       - name: Build & push image (Artifact Registry)
         run: |
           REGION=${{ secrets.GCP_REGION }}
           PROJECT=${{ secrets.GCP_PROJECT_ID }}
           REPO=containers
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/ingest-weather"
-          # Ensure repo exists (one-time; safe to re-run)
+
           gcloud artifacts repositories describe $REPO --location=$REGION || \
             gcloud artifacts repositories create $REPO --repository-format=docker --location=$REGION
-          gcloud builds submit ingestion --tag "$IMAGE"
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+          ALT_BUCKET="${PROJECT}-cloudbuild-alt"
+          gsutil ls gs://${ALT_BUCKET} || gsutil mb -l $REGION gs://${ALT_BUCKET}
+
+          gcloud builds submit ingestion --tag "$IMAGE" \
+            --gcs-source-staging-dir=gs://${ALT_BUCKET}/source \
+            --gcs-log-dir=gs://${ALT_BUCKET}/logs
+
 
       - name: Deploy Cloud Run Job
         run: |
